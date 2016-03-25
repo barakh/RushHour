@@ -43,6 +43,8 @@ db =
            'y': '276.7557723004153'}
 }
 * listening_port is also the car ID
+* The cars with the ID of 255/254 are actually the current location of the
+* mouse pointer.
 """
 count = 0
 def car_control(db):
