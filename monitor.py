@@ -1,5 +1,5 @@
 # coding: utf-8
-from math import sin, cos
+from math import sin, cos, pi
 import pygame
 import time
 import random
@@ -7,6 +7,7 @@ import socket
 import re
 import thread
 from pprint import pprint
+from pprint import pformat
 from threading import Lock
 from car_control import car_control
 
@@ -62,8 +63,25 @@ def control(db, db_lock):
         time.sleep(0.1)
         car_control(db)
 
+def get_mouse():
+    x = y = 0
+    running = 1
+    sock = socket.socket(socket.AF_INET, # Internet
+                         socket.SOCK_DGRAM) # UDP
+
+    while running:
+        pygame.event.clear()
+        time.sleep(0.05)
+        event = pygame.event.poll()
+        if event.type == pygame.MOUSEMOTION:
+            data = pformat((255, event.pos, 0)) + "\n"
+            sock.sendto(data, (UDP_IP, UDP_PORT))
+            data = pformat((254, event.pos, pi / 2)) + "\n"
+            sock.sendto(data, (UDP_IP, UDP_PORT))
+
 def monitor(db, db_lock):
     surface = Surface()
+    thread.start_new_thread(get_mouse, ())
     while True:
         #The temp db is used because the actual db may change during the
         #operation
@@ -86,7 +104,9 @@ def main():
     db_lock = Lock()
     thread.start_new_thread(updater, (db, db_lock,))
     thread.start_new_thread(control, (db, db_lock,))
-    monitor(db, db_lock)
+    thread.start_new_thread(monitor, (db, db_lock,))
+    while True:
+        time.sleep(1000)
 
 if __name__ == "__main__":
     main()
