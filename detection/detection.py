@@ -24,7 +24,7 @@ class Detector(object):
             for (color, (lower, upper)) in color_boundries_dict.iteritems()}
         self.colors = color_boundries_dict.keys()
 
-    def get_img_color_mask(self, img, color):
+    def find_img_by_color_mask(self, img, color):
         '''find the colors within the specified boundaries'''
         if not self.color_array_boundaries.has_key(color):
             return None
@@ -32,7 +32,7 @@ class Detector(object):
         return cv2.inRange(img, self.color_array_boundaries[color][0],
                            self.color_array_boundaries[color][1])
 
-    def get_target_mask(self, img, identifier):
+    def find_target_mask(self, img, identifier):
         color1 = identifier[0]
         color2 = identifier[1]
 
@@ -41,8 +41,8 @@ class Detector(object):
         if not self.color_array_boundaries.has_key(color2):
             return None
 
-        mask_color1 = self.get_img_color_mask(img, color1)
-        mask_color2 = self.get_img_color_mask(img, color2)
+        mask_color1 = self.find_img_by_color_mask(img, color1)
+        mask_color2 = self.find_img_by_color_mask(img, color2)
 
         # create a mask of both colors
         color_combination_mask = cv2.bitwise_or(mask_color1, mask_color2)
@@ -60,19 +60,19 @@ class Detector(object):
 
         return biggest_marker_mask
 
-    def get_blob_position(self, blob):
+    def find_object_center(self, blob):
         # find the center of mass
         center = ndimage.measurements.center_of_mass(blob)
 
         return center
 
     def find_target(self, img, identifier):
-        target_mask = self.get_target_mask(img, identifier)
-        center = self.get_blob_position(target_mask)
+        target_mask = self.find_target_mask(img, identifier)
+        center = self.find_object_center(target_mask)
 
         return target_mask, center
 
-    def find_targets(self, img):
+    def find_all_targets(self, img):
         findings = []
         for combo in itertools.combinations(self.colors, 2):
             findings.append(self.find_target(img, combo))
@@ -100,5 +100,5 @@ if __name__=='__main__':
     image = cv2.imread(IMG_PATH)
     detector = Detector(COLOR_BOUNDARIES)
 
-    findings = detector.find_targets(image)
+    findings = detector.find_all_targets(image)
     detector.display_markers(image, findings)
