@@ -18,7 +18,7 @@ class FailedReadFrameError(Exception):
 
 class Camera(object):
     def __init__(self, address = ADDRESS):
-        self.vcap = cv2.VideoCapture(address)
+        self._vcap = cv2.VideoCapture(address)
 
         if self.is_opened == False:
             raise FailedOpeningVideoError
@@ -30,19 +30,22 @@ class Camera(object):
                                              name = 'read_thread')
         self._read_thread.start()
 
-    def __del__(self):
+    def close(self):
         self._closing_event.set()
+        while self._read_thread.is_alive():
+            pass
+        self._vcap.release()
 
     @property
     def is_opened(self):
-        return self.vcap.isOpened()
+        return self._vcap.isOpened()
 
     def _readContinuous(self):
         while (True):
             if self._closing_event.is_set():
                 break
 
-            ret, frame = self.vcap.read()
+            ret, frame = self._vcap.read()
 
             if ret == False:
                 raise FailedReadFrameError
@@ -68,3 +71,5 @@ if __name__ == '__main__':
 
         if cv2.waitKey(100) == ord('q'):
             break
+
+    cam.close()
