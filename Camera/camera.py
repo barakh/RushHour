@@ -1,5 +1,5 @@
 import cv2
-import time
+import threading
 
 # VID_PATH = r'd:\Projects\RushHour\30.Rock.S06E14.HDTV.x264-LOL.mp4'
 VID_PATH = r'd:\Projects\RushHour\IMG_1928.MOV'
@@ -23,15 +23,36 @@ class Camera(object):
         if self.is_opened == False:
             raise FailedOpeningVideoError
 
+        self._closing_event = threading.Event()
+        self._frame_lock = threading.Lock()
+        self._current_frame = None
+        self._read_thread = threading.Thread(target = self._readContinuous,
+                                             name = 'read_thread')
+        self._read_thread.start()
+
+    def __del__(self):
+        self._closing_event.set()
+
     @property
     def is_opened(self):
         return self.vcap.isOpened()
 
-    def read(self):
-        ret, frame = self.vcap.read()
+    def _readContinuous(self):
+        while (True):
+            if self._closing_event.is_set():
+                break
 
-        if ret == False:
-            raise FailedReadFrameError
+            ret, frame = self.vcap.read()
+
+            if ret == False:
+                raise FailedReadFrameError
+
+            with self._frame_lock:
+                self._current_frame = frame
+
+    def getCurrentFrame(self):
+        with self._frame_lock:
+            frame = self._current_frame
 
         return frame
 
@@ -40,8 +61,10 @@ if __name__ == '__main__':
     cam = Camera(r'http://204.248.124.202/mjpg/video.mjpg')
 
     while(1):
-        frame = cam.read()
+        frame = cam.getCurrentFrame()
 
-        cv2.imshow('VIDEO', frame)
-        if cv2.waitKey(1000) == ord('q'):
+        if type(frame) != type(None):
+            cv2.imshow('VIDEO', frame)
+
+        if cv2.waitKey(100) == ord('q'):
             break
