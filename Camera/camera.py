@@ -1,14 +1,10 @@
 import cv2
 import threading
 
-# VID_PATH = r'd:\Projects\RushHour\30.Rock.S06E14.HDTV.x264-LOL.mp4'
-VID_PATH = r'd:\Projects\RushHour\IMG_1928.MOV'
-
-ADDRESS = 'rtsp://192.168.1.254/sjcam.mov'
-# ADDRESS = 'http://204.248.124.202/mjpg/video.mjpg' # God knows where
-# ADDRESS = 0 # Device (webcam)
-# ADDRESS = 1 # Device (webcam)
-# ADDRESS = VID_PATH
+WIFI_CAM_ADDRESS = 'rtsp://192.168.1.254/sjcam.mov'
+STREET_CAM_STREAM = 'http://204.248.124.202/mjpg/video.mjpg' # God knows where
+LAPTOP_CAM_ADDRESS = 0 # Device (builtin webcam)
+ADDITIONAL_CAM_ADDRESS = 1 # Device (additional webcam, when connected by USB)
 
 class FailedOpeningVideoError(Exception):
     pass
@@ -17,7 +13,13 @@ class FailedReadFrameError(Exception):
     pass
 
 class Camera(object):
-    def __init__(self, address = ADDRESS):
+    ''' A class for reading frames from live camera, or a movie that
+    runs in the background.
+    '''
+    def __init__(self, address = WIFI_CAM_ADDRESS):
+        '''
+        :param address: Integer for device, path for file, url for stream.
+        '''
         self._vcap = cv2.VideoCapture(address)
 
         if self.is_opened == False:
@@ -25,6 +27,11 @@ class Camera(object):
 
         self._frame_lock = threading.Lock()
         self._current_frame = None
+
+        # This thread continuously reads frames from the camera stream.
+        # When cv2.VideoCapture.read is called, it returs the next frame,
+        # not the latest. In order to get the latest frame, we
+        # always read frames and throw them away.
         self._read_thread = threading.Thread(target = self._readContinuous,
                                              name = 'read_thread')
         self._read_thread.setDaemon(True)
@@ -32,9 +39,16 @@ class Camera(object):
 
     @property
     def is_opened(self):
+        '''
+        :return: True if stream is open, otherwise False.
+        '''
         return self._vcap.isOpened()
 
     def _readContinuous(self):
+        ''' "Silently" play a movie in blocking mode.
+        (Read frames but don't display them).
+        Normally runs in a thread that is owned by the class.
+        '''
         while (True):
             ret, frame = self._vcap.read()
 
@@ -45,14 +59,17 @@ class Camera(object):
                 self._current_frame = frame
 
     def getCurrentFrame(self):
+        '''
+        :return: The latest frame from the stream.
+        '''
         with self._frame_lock:
             frame = self._current_frame
 
         return frame
 
 if __name__ == '__main__':
-    # cam = Camera(ADDRESS)
-    cam = Camera(r'http://204.248.124.202/mjpg/video.mjpg')
+    # cam = Camera(WIFI_CAM_ADDRESS)
+    cam = Camera(STREET_CAM_STREAM)
 
     while(1):
         frame = cam.getCurrentFrame()
