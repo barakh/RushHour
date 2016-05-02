@@ -23,18 +23,12 @@ class Camera(object):
         if self.is_opened == False:
             raise FailedOpeningVideoError
 
-        self._closing_event = threading.Event()
         self._frame_lock = threading.Lock()
         self._current_frame = None
         self._read_thread = threading.Thread(target = self._readContinuous,
                                              name = 'read_thread')
+        self._read_thread.setDaemon(True)
         self._read_thread.start()
-
-    def close(self):
-        self._closing_event.set()
-        while self._read_thread.is_alive():
-            pass
-        self._vcap.release()
 
     @property
     def is_opened(self):
@@ -42,9 +36,6 @@ class Camera(object):
 
     def _readContinuous(self):
         while (True):
-            if self._closing_event.is_set():
-                break
-
             ret, frame = self._vcap.read()
 
             if ret == False:
@@ -71,5 +62,3 @@ if __name__ == '__main__':
 
         if cv2.waitKey(100) == ord('q'):
             break
-
-    cam.close()
