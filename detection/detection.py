@@ -2,47 +2,35 @@ import cv2
 import itertools
 import numpy as np
 from scipy import ndimage
-from collections import OrderedDict
+import math
 
-IMG_PATH = 'cars.png'
+IMG_PATH = 'cars-hsv.png'
 
-COLOR_BOUNDARIES = OrderedDict([
-    ('blue', ([200, 0, 0], [255, 50, 50])),
-    ('green', ([0, 200, 0], [50, 255, 50])),
-    ('red', ([0, 0, 200], [50, 50, 255])),
-    ('yellow', ([0, 200, 200], [50, 255, 255])),
-    ('magenta', ([200, 0, 200], [255, 50, 255])),
-    ('cyan', ([200, 200, 0], [255, 255, 50])),
-    ('black', ([0, 0, 0], [50, 50, 50])),
-])
+DIFFERENT_COLORS = 7
+HUE_MAX = 179
+
 
 class Detector(object):
-    def __init__(self, color_boundries_dict):
-        self.color_array_boundaries = {
-            color: (np.array(lower, dtype="uint8"),
-                    np.array(upper, dtype="uint8"))
-            for (color, (lower, upper)) in color_boundries_dict.iteritems()}
-        self.colors = color_boundries_dict.keys()
+    def __init__(self):
+        lower_bounds = [int(HUE_MAX * float(i)/DIFFERENT_COLORS) for i in range(DIFFERENT_COLORS)]
+        upper_bounds = [int(HUE_MAX * float(i+1)/DIFFERENT_COLORS) - 1 for i in range(DIFFERENT_COLORS)]
+        upper_bounds[-1] = HUE_MAX  # to include all possibilities
 
-    def find_img_by_color_mask(self, img, color):
-        '''find the colors within the specified boundaries'''
-        if not self.color_array_boundaries.has_key(color):
-            return None
+        self.color_array_boundaries = [(np.array([lower, 1, 1], dtype="uint8"),
+                                        np.array([upper, 254, 254], dtype="uint8"))
+                                       for lower, upper in zip(lower_bounds, upper_bounds)]
 
-        return cv2.inRange(img, self.color_array_boundaries[color][0],
+    def find_img_by_color_mask(self, hsv_img, color):
+        # find the colors within the specified boundaries
+        return cv2.inRange(hsv_img, self.color_array_boundaries[color][0],
                            self.color_array_boundaries[color][1])
 
-    def find_target_mask(self, img, identifier):
-        color1 = identifier[0]
-        color2 = identifier[1]
+    def find_target_mask(self, img, hsv_img, identifier):
+        color_id1 = identifier[0]
+        color_id2 = identifier[1]
 
-        if not self.color_array_boundaries.has_key(color1):
-            return None
-        if not self.color_array_boundaries.has_key(color2):
-            return None
-
-        mask_color1 = self.find_img_by_color_mask(img, color1)
-        mask_color2 = self.find_img_by_color_mask(img, color2)
+        mask_color1 = self.find_img_by_color_mask(hsv_img, color_id1)
+        mask_color2 = self.find_img_by_color_mask(hsv_img, color_id2)
 
         # create a mask of both colors
         color_combination_mask = cv2.bitwise_or(mask_color1, mask_color2)
@@ -51,7 +39,11 @@ class Detector(object):
         _, markers = cv2.connectedComponents(color_combination_mask)
 
         # find the biggest colored region. the others are probably noise
-        biggest_marker = np.argmax(np.bincount(markers[markers.nonzero()]))
+        marker_sizes = np.bincount(markers[markers.nonzero()])
+        if len(marker_sizes) == 0:
+            biggest_marker = -1
+        else:
+            biggest_marker = np.argmax(marker_sizes)
 
         # transform to a mask leaving only the biggest marker-
         # biggest-marker => 255, the rest => 0
@@ -66,16 +58,17 @@ class Detector(object):
 
         return center
 
-    def find_target(self, img, identifier):
-        target_mask = self.find_target_mask(img, identifier)
+    def find_target(self, img, hsv_img, identifier):
+        target_mask = self.find_target_mask(img, hsv_img, identifier)
         center = self.find_object_center(target_mask)
 
         return target_mask, center
 
-    def find_all_targets(self, img):
+    def find_all_targets(self, img, hsv_img):
         findings = []
-        for combo in itertools.combinations(self.colors, 2):
-            findings.append(self.find_target(img, combo))
+        for combo in itertools.combinations(range(DIFFERENT_COLORS), 2):
+            # TODO- only valid car combos
+            findings.append(self.find_target(img, hsv_img, combo))
 
         return findings
 
@@ -87,18 +80,20 @@ class Detector(object):
             output = cv2.bitwise_and(img, img, mask=target_mask)
             output[0 == target_mask] = [255, 255, 255]
 
-            cv2.drawMarker(output, (int(center[1]), int(center[0])),
-                           color=[150, 150, 150], markerType=1, thickness=3,
-                           markerSize=10)
+            if not math.isnan(center[1]) and not math.isnan(center[0]):
+                cv2.drawMarker(output, (int(center[1]), int(center[0])),
+                               color=[150, 150, 150], markerType=1, thickness=3,
+                               markerSize=10)
 
             # show the images
             cv2.imshow("images", np.hstack([img, output]))
             cv2.waitKey(0)
 
-if __name__=='__main__':
+if __name__ == '__main__':
     # load the image
     image = cv2.imread(IMG_PATH)
-    detector = Detector(COLOR_BOUNDARIES)
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    findings = detector.find_all_targets(image)
-    detector.display_markers(image, findings)
+    detector = Detector()
+    results = detector.find_all_targets(image, hsv)
+    detector.display_markers(image, results)
