@@ -4,7 +4,7 @@ import numpy as np
 from scipy import ndimage
 import math
 
-IMG_PATH = 'cars-hsv.png'
+IMG_PATH = 'cars_hsv_s_0.5_v_1.0.png'
 
 DIFFERENT_COLORS = 7
 HUE_MAX = 179
@@ -17,7 +17,7 @@ class Detector(object):
         upper_bounds[-1] = HUE_MAX  # to include all possibilities
 
         self.color_array_boundaries = [(np.array([lower, 1, 1], dtype="uint8"),
-                                        np.array([upper, 254, 254], dtype="uint8"))
+                                        np.array([upper, 255, 255], dtype="uint8"))
                                        for lower, upper in zip(lower_bounds, upper_bounds)]
 
     def find_img_by_color_mask(self, hsv_img, color):
@@ -34,6 +34,9 @@ class Detector(object):
 
         # create a mask of both colors
         color_combination_mask = cv2.bitwise_or(mask_color1, mask_color2)
+
+        # for debugging original color mask, uncomment this
+        # return color_combination_mask
 
         # classify colored regions into separate object markers
         _, markers = cv2.connectedComponents(color_combination_mask)
@@ -86,7 +89,9 @@ class Detector(object):
                                markerSize=10)
 
             # show the images
-            cv2.imshow("images", np.hstack([img, output]))
+            img_to_show = cv2.resize(img, (350, 700))
+            output_to_show = cv2.resize(output, (350, 700))
+            cv2.imshow("images", np.hstack([img_to_show, output_to_show]))
             cv2.waitKey(0)
 
 if __name__ == '__main__':
