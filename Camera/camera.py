@@ -71,11 +71,19 @@ if __name__ == '__main__':
     # cam = Camera(WIFI_CAM_ADDRESS)
     cam = Camera(STREET_CAM_STREAM)
 
+    im_ind = 0
+
     while(1):
         frame = cam.getCurrentFrame()
 
         if type(frame) != type(None):
             cv2.imshow('VIDEO', frame)
 
-        if cv2.waitKey(100) == ord('q'):
+        key = cv2.waitKey(100)
+
+        if key == ord('q'):
             break
+        elif key == ord('s'):
+            filename = 'screenshot_{:03d}.png'.format(im_ind)
+            im_ind += 1
+            cv2.imwrite(filename, frame)
