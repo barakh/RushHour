@@ -4,7 +4,9 @@ import numpy as np
 from scipy import ndimage
 import math
 
-IMG_PATH = 'cars_hsv_s_0.5_v_1.0.png'
+# IMG_PATH = 'cars_hsv_s_0.5_v_0.5.png'
+# IMG_PATH = r'd:\Projects\RushHour\code\Camera\screenshot_000_cropped.png'
+IMG_PATH = r'd:\Projects\RushHour\code\Camera\screenshot_003_cropped.png'
 
 DIFFERENT_COLORS = 7
 HUE_MAX = 179
@@ -94,11 +96,44 @@ class Detector(object):
             cv2.imshow("images", np.hstack([img_to_show, output_to_show]))
             cv2.waitKey(0)
 
+    def start_color_picking(self, img, hsv = True):
+        img_resized = cv2.resize(img, (300, 600))
+        if hsv == True:
+            self.image_color_pick = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
+        else:
+            self.image_color_pick = img_resized
+
+        window_name = 'color_picking'
+        cv2.imshow('color_picking', img_resized)
+
+        cv2.setMouseCallback(window_name, self.mouse_callback)
+
+        cv2.waitKey()
+
+    def mouse_callback(self, event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            color = self.image_color_pick[y,x]
+            print '({}, {}) = {}'.format(x, y, color)
+
+
 if __name__ == '__main__':
     # load the image
     image = cv2.imread(IMG_PATH)
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
+    # detector = Detector()
+    # results = detector.find_all_targets(image, hsv)
+    # detector.display_markers(image, results)
+
     detector = Detector()
-    results = detector.find_all_targets(image, hsv)
-    detector.display_markers(image, results)
+
+    small = cv2.resize(image, (300, 600))
+    detector.start_color_picking(small)
+    cv2.imshow('0', small)
+
+    for ind in range(DIFFERENT_COLORS):
+        res = detector.find_img_by_color_mask(hsv, ind)
+        small = cv2.resize(res, (300, 600))
+        cv2.imshow('1', small)
+
+        cv2.waitKey(0)
