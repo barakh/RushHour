@@ -9,6 +9,8 @@ IMG_PATH = r'sample_images\cars_hsv_s_0.5_v_0.5_photographed.png'
 
 DIFFERENT_COLORS = 7
 HUE_MAX = 179
+MIN_CAR_SIZE = 200
+MAX_CAR_SIZE = 3000
 
 
 class Detector(object):
@@ -42,18 +44,18 @@ class Detector(object):
         # classify colored regions into separate object markers
         _, markers = cv2.connectedComponents(color_combination_mask)
 
+        # create initial empty mask
+        biggest_marker_mask = np.zeros(img.shape[0:2], 'uint8')
+
         # find the biggest colored region. the others are probably noise
         marker_sizes = np.bincount(markers[markers.nonzero()])
-        if len(marker_sizes) == 0:
-            biggest_marker = -1
-        else:
-            biggest_marker = np.argmax(marker_sizes)
+        marker_sizes[(marker_sizes < MIN_CAR_SIZE) | (marker_sizes > MAX_CAR_SIZE)] = -1
+        if len(marker_sizes) == 0 or np.all(marker_sizes == -1):
+            return biggest_marker_mask  # zeros- target not found
+        biggest_marker = np.argmax(marker_sizes)
 
-        # transform to a mask leaving only the biggest marker-
-        # biggest-marker => 255, the rest => 0
-        biggest_marker_mask = np.zeros(img.shape[0:2], 'uint8')
+        # transform to a mask leaving only the biggest marker
         biggest_marker_mask[markers == biggest_marker] = 255
-
         return biggest_marker_mask
 
     def find_object_center(self, blob):
