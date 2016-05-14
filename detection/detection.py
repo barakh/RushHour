@@ -4,9 +4,8 @@ import numpy as np
 from scipy import ndimage
 import math
 
-# IMG_PATH = 'cars_hsv_s_0.5_v_0.5.png'
-# IMG_PATH = r'd:\Projects\RushHour\code\Camera\screenshot_000_cropped.png'
-IMG_PATH = r'd:\Projects\RushHour\code\Camera\screenshot_003_cropped.png'
+# IMG_PATH = r'sample_images\cars_hsv_s_0.5_v_0.5_artificial.png'
+IMG_PATH = r'sample_images\cars_hsv_s_0.5_v_0.5_photographed.png'
 
 DIFFERENT_COLORS = 7
 HUE_MAX = 179
@@ -121,19 +120,19 @@ if __name__ == '__main__':
     image = cv2.imread(IMG_PATH)
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    # detector = Detector()
-    # results = detector.find_all_targets(image, hsv)
-    # detector.display_markers(image, results)
-
     detector = Detector()
+    results = detector.find_all_targets(image, hsv)
+    detector.display_markers(image, results)
 
-    small = cv2.resize(image, (300, 600))
-    detector.start_color_picking(small)
-    cv2.imshow('0', small)
-
-    for ind in range(DIFFERENT_COLORS):
-        res = detector.find_img_by_color_mask(hsv, ind)
-        small = cv2.resize(res, (300, 600))
-        cv2.imshow('1', small)
-
-        cv2.waitKey(0)
+    # detector = Detector()
+    #
+    # small = cv2.resize(image, (300, 600))
+    # detector.start_color_picking(small)
+    # cv2.imshow('0', small)
+    #
+    # for ind in range(DIFFERENT_COLORS):
+    #     res = detector.find_img_by_color_mask(hsv, ind)
+    #     small = cv2.resize(res, (300, 600))
+    #     cv2.imshow('1', small)
+    #
+    #     cv2.waitKey(0)
