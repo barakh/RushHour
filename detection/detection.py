@@ -10,7 +10,11 @@ IMG_PATH = r'sample_images\cars_hsv_s_0.5_v_0.5_photographed.png'
 DIFFERENT_COLORS = 7
 HUE_MAX = 179
 MIN_CAR_SIZE = 200
-MAX_CAR_SIZE = 3000
+MAX_CAR_SIZE = 4000
+DILATION_KERNAL_SIZE = 5
+DILATION_ITERATIONS = 4
+
+DEBUG = False
 
 
 class Detector(object):
@@ -35,14 +39,18 @@ class Detector(object):
         mask_color1 = self.find_img_by_color_mask(hsv_img, color_id1)
         mask_color2 = self.find_img_by_color_mask(hsv_img, color_id2)
 
-        # create a mask of both colors
+        # create a mask of both colors, eliminate small spaces
         color_combination_mask = cv2.bitwise_or(mask_color1, mask_color2)
+        dilation_kernel = np.ones((DILATION_KERNAL_SIZE, DILATION_KERNAL_SIZE), np.uint8)
+        color_combination_mask_dilated = cv2.dilate(color_combination_mask, dilation_kernel, DILATION_ITERATIONS)
 
-        # for debugging original color mask, uncomment this
-        # return color_combination_mask
+        if DEBUG:
+            self.display_images(mask_color1, mask_color2)
+            self.display_images(color_combination_mask, color_combination_mask_dilated)
+            return color_combination_mask
 
         # classify colored regions into separate object markers
-        _, markers = cv2.connectedComponents(color_combination_mask)
+        _, markers = cv2.connectedComponents(color_combination_mask_dilated)
 
         # create initial empty mask
         biggest_marker_mask = np.zeros(img.shape[0:2], 'uint8')
@@ -60,9 +68,7 @@ class Detector(object):
 
     def find_object_center(self, blob):
         # find the center of mass
-        center = ndimage.measurements.center_of_mass(blob)
-
-        return center
+        return ndimage.measurements.center_of_mass(blob)
 
     def find_target(self, img, hsv_img, identifier):
         target_mask = self.find_target_mask(img, hsv_img, identifier)
@@ -116,6 +122,11 @@ class Detector(object):
             color = self.image_color_pick[y,x]
             print '({}, {}) = {}'.format(x, y, color)
 
+    def display_images(self, img1, img2):
+        complete_image = np.hstack([img1, img2])
+        cv2.imshow('Images', complete_image)
+        cv2.waitKey()
+
 
 if __name__ == '__main__':
     # load the image
@@ -125,6 +136,9 @@ if __name__ == '__main__':
     detector = Detector()
     results = detector.find_all_targets(image, hsv)
     detector.display_markers(image, results)
+
+    # detector = Detector()
+    # detector.find_target_mask(image, hsv, [0,1])
 
     # detector = Detector()
     #
