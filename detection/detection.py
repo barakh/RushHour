@@ -18,7 +18,7 @@ class Detector(object):
         upper_bounds = [int(HUE_MAX * float(i+1)/DIFFERENT_COLORS) - 1 for i in range(DIFFERENT_COLORS)]
         upper_bounds[-1] = HUE_MAX  # to include all possibilities
 
-        self.color_array_boundaries = [(np.array([lower, 1, 1], dtype="uint8"),
+        self.color_array_boundaries = [(np.array([lower, 50, 1], dtype="uint8"),
                                         np.array([upper, 255, 255], dtype="uint8"))
                                        for lower, upper in zip(lower_bounds, upper_bounds)]
 
