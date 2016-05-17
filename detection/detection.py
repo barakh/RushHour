@@ -32,12 +32,12 @@ class Detector(object):
         return cv2.inRange(hsv_img, self.color_array_boundaries[color][0],
                            self.color_array_boundaries[color][1])
 
-    def find_target_mask(self, img, hsv_img, identifier):
+    def find_target_mask(self, img, identifier, imgs_by_color_masks):
         color_id1 = identifier[0]
         color_id2 = identifier[1]
 
-        mask_color1 = self.find_img_by_color_mask(hsv_img, color_id1)
-        mask_color2 = self.find_img_by_color_mask(hsv_img, color_id2)
+        mask_color1 = imgs_by_color_masks[color_id1]
+        mask_color2 = imgs_by_color_masks[color_id2]
 
         # create a mask of both colors, eliminate small spaces
         color_combination_mask = cv2.bitwise_or(mask_color1, mask_color2)
@@ -70,17 +70,19 @@ class Detector(object):
         # find the center of mass
         return ndimage.measurements.center_of_mass(blob)
 
-    def find_target(self, img, hsv_img, identifier):
-        target_mask = self.find_target_mask(img, hsv_img, identifier)
+    def find_target(self, img, identifier, imgs_by_color_masks):
+        target_mask = self.find_target_mask(img, identifier, imgs_by_color_masks)
         center = self.find_object_center(target_mask)
 
         return target_mask, center
 
     def find_all_targets(self, img, hsv_img):
+        color_ids = range(DIFFERENT_COLORS)
+        imgs_by_color_masks = [self.find_img_by_color_mask(hsv_img, color_id) for color_id in color_ids]
         findings = []
-        for combo in itertools.combinations(range(DIFFERENT_COLORS), 2):
+        for combo in itertools.combinations(color_ids, 2):
             # TODO- only valid car combos
-            findings.append(self.find_target(img, hsv_img, combo))
+            findings.append(self.find_target(img, combo, imgs_by_color_masks))
 
         return findings
 
