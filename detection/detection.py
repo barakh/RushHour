@@ -64,17 +64,22 @@ class Detector(object):
 
         # transform to a mask leaving only the biggest marker
         biggest_marker_mask[markers == biggest_marker] = 255
-        return biggest_marker_mask
+
+        color1_selected_mask = cv2.bitwise_and(mask_color1, biggest_marker_mask)
+        color2_selected_mask = cv2.bitwise_and(mask_color2, biggest_marker_mask)
+        return biggest_marker_mask, color1_selected_mask, color2_selected_mask
 
     def find_object_center(self, blob):
         # find the center of mass
         return ndimage.measurements.center_of_mass(blob)
 
     def find_target(self, img, identifier, imgs_by_color_masks):
-        target_mask = self.find_target_mask(img, identifier, imgs_by_color_masks)
+        target_mask, color1_mask, color2_mask = self.find_target_mask(img, identifier, imgs_by_color_masks)
         center = self.find_object_center(target_mask)
+        color1_center = self.find_object_center(color1_mask)
+        color2_center = self.find_object_center(color2_mask)
 
-        return target_mask, center
+        return target_mask, center, [color1_center, color2_center]
 
     def find_all_targets(self, img, hsv_img):
         color_ids = range(DIFFERENT_COLORS)
@@ -88,22 +93,31 @@ class Detector(object):
 
     def display_markers(self, img, findings):
         for finding in findings:
-            target_mask, center = finding
+            target_mask, center, direction = finding
 
             # apply the mask, and fill the background white
             output = cv2.bitwise_and(img, img, mask=target_mask)
             output[0 == target_mask] = [255, 255, 255]
 
-            if not math.isnan(center[1]) and not math.isnan(center[0]):
-                cv2.drawMarker(output, (int(center[1]), int(center[0])),
+            if self.is_legal_point(center):
+                cv2.drawMarker(output, self.point_to_display(center),
                                color=[150, 150, 150], markerType=1, thickness=3,
                                markerSize=10)
+            if self.is_legal_point(direction[0]) and self.is_legal_point(direction[1]):
+                cv2.line(output, self.point_to_display(direction[0]),
+                         self.point_to_display(direction[1]), [255, 255, 255], 3)
 
             # show the images
             img_to_show = cv2.resize(img, (350, 700))
             output_to_show = cv2.resize(output, (350, 700))
             cv2.imshow("images", np.hstack([img_to_show, output_to_show]))
             cv2.waitKey(0)
+
+    def is_legal_point(self, point):
+        return not math.isnan(point[0]) and not math.isnan(point[1])
+
+    def point_to_display(self, point):
+        return int(point[1]), int(point[0])
 
     def start_color_picking(self, img, hsv = True):
         img_resized = cv2.resize(img, (300, 600))
