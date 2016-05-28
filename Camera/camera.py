@@ -7,6 +7,8 @@ STREET_CAM_STREAM = 'http://204.248.124.202/mjpg/video.mjpg' # God knows where
 LAPTOP_CAM_ADDRESS = 0 # Device (builtin webcam)
 ADDITIONAL_CAM_ADDRESS = 1 # Device (additional webcam, when connected by USB)
 
+MAX_UP_TIME = 20 # sec
+
 class FailedOpeningVideoError(Exception):
     pass
 
@@ -50,15 +52,18 @@ class Camera(object):
     def _watchdog(self):
         time.sleep(10)
         while (True):
-            time.sleep(1)
+            time.sleep(2)
 
             if self._watchdog_kicked == False:
-                print 'Bark! Read thread stuck. Restarting.'
-                del self._read_thread
-                # del self._vcap
+                print 'Bark! Read thread stuck.'
+                print 'up_time = {}'.format(self.up_time)
 
-                self.startContinuousReadThread()
-                time.sleep(10)
+                # print 'Bark! Read thread stuck. Restarting.'
+                # # del self._read_thread
+                # # del self._vcap
+                #
+                # self.startContinuousReadThread()
+                # time.sleep(10)
 
             self._watchdog_kicked = False
 
@@ -74,13 +79,24 @@ class Camera(object):
         (Read frames but don't display them).
         Normally runs in a thread that is owned by the class.
         '''
+        print 'Starting capture'
         self._vcap = cv2.VideoCapture(self.address)
+        start_time = time.time()
+        self.up_time = 0
 
         if self.is_opened == False:
             raise FailedOpeningVideoError
 
         while (True):
             self._watchdog_kicked = True
+            self.up_time = time.time() - start_time
+
+            if (self.up_time > MAX_UP_TIME):
+                print 'Starting capture'
+                del self._vcap
+                self._vcap = cv2.VideoCapture(self.address)
+                start_time = time.time()
+                self.up_time = 0
 
             ret, frame = self._vcap.read()
 
