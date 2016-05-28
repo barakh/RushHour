@@ -5,16 +5,17 @@ from scipy import ndimage
 import math
 
 # IMG_PATH = r'sample_images\cars_hsv_s_0.5_v_0.5_artificial.png'
-IMG_PATH = r'sample_images\cars_hsv_s_0.5_v_0.5_photographed.png'
+# IMG_PATH = r'sample_images\cars_hsv_s_0.5_v_0.5_photographed.png'
+IMG_PATH = r'..\screenshot_000.png'
 
 DIFFERENT_COLORS = 7
 HUE_MAX = 179
-MIN_CAR_SIZE = 200
-MAX_CAR_SIZE = 4000
+MIN_CAR_SIZE = 500
+MAX_CAR_SIZE = 10000
 DILATION_KERNAL_SIZE = 5
 DILATION_ITERATIONS = 4
 
-DEBUG = False
+DEBUG = True
 
 
 class Detector(object):
@@ -26,6 +27,9 @@ class Detector(object):
         self.color_array_boundaries = [(np.array([lower, 50, 1], dtype="uint8"),
                                         np.array([upper, 255, 255], dtype="uint8"))
                                        for lower, upper in zip(lower_bounds, upper_bounds)]
+        self.color_ids = range(DIFFERENT_COLORS)
+        # TODO- only valid car combos, ordered back-color -> front-color, i.e: [(1,2), (2,3)]
+        self.possible_cars = itertools.combinations(self.color_ids, 2)
 
     def find_img_by_color_mask(self, hsv_img, color):
         # find the colors within the specified boundaries
@@ -45,9 +49,8 @@ class Detector(object):
         color_combination_mask_dilated = cv2.dilate(color_combination_mask, dilation_kernel, DILATION_ITERATIONS)
 
         if DEBUG:
-            self.display_images(mask_color1, mask_color2)
-            self.display_images(color_combination_mask, color_combination_mask_dilated)
-            return color_combination_mask
+            pic_name = 'res\mask%s-%s.png' % (color_id1, color_id2)
+            self.show_mask(img, color_combination_mask_dilated, pic_name)
 
         # classify colored regions into separate object markers
         _, markers = cv2.connectedComponents(color_combination_mask_dilated)
@@ -59,12 +62,14 @@ class Detector(object):
         marker_sizes = np.bincount(markers[markers.nonzero()])
         marker_sizes[(marker_sizes < MIN_CAR_SIZE) | (marker_sizes > MAX_CAR_SIZE)] = -1
         if len(marker_sizes) == 0 or np.all(marker_sizes == -1):
-            return biggest_marker_mask  # zeros- target not found
+            # zeros- target not found
+            return biggest_marker_mask, biggest_marker_mask, biggest_marker_mask
         biggest_marker = np.argmax(marker_sizes)
 
         # transform to a mask leaving only the biggest marker
         biggest_marker_mask[markers == biggest_marker] = 255
 
+        # get the "winning" masks for each color separately (to find direction)
         color1_selected_mask = cv2.bitwise_and(mask_color1, biggest_marker_mask)
         color2_selected_mask = cv2.bitwise_and(mask_color2, biggest_marker_mask)
         return biggest_marker_mask, color1_selected_mask, color2_selected_mask
@@ -82,16 +87,31 @@ class Detector(object):
         return target_mask, center, [color1_center, color2_center]
 
     def find_all_targets(self, img, hsv_img):
-        color_ids = range(DIFFERENT_COLORS)
-        imgs_by_color_masks = [self.find_img_by_color_mask(hsv_img, color_id) for color_id in color_ids]
+        imgs_by_color_masks = [self.find_img_by_color_mask(hsv_img, color_id) for color_id in self.color_ids]
+        if DEBUG:
+            self.show_all_masks(img, imgs_by_color_masks)
         findings = []
-        for combo in itertools.combinations(color_ids, 2):
-            # TODO- only valid car combos
+        for combo in self.possible_cars:
             findings.append(self.find_target(img, combo, imgs_by_color_masks))
 
         return findings
 
-    def display_markers(self, img, findings):
+    def show_all_masks(self, img, masks):
+        for i, mask in enumerate(masks):
+            self.show_mask(img, mask, 'res\mask%s.png' % i)
+
+
+    def show_mask(self, img, mask, pic_name = None):
+        output = cv2.bitwise_and(img, img, mask=mask)
+        output[0 == mask] = [255, 255, 255]
+        stacked = np.hstack([img, output])
+        if pic_name == None:
+            cv2.imshow("masks", stacked)
+            cv2.waitKey(0)
+        else:
+            cv2.imwrite(pic_name, stacked)
+
+    def display_separate_markers(self, img, findings, resize=False):
         for finding in findings:
             target_mask, center, direction = finding
 
@@ -99,19 +119,49 @@ class Detector(object):
             output = cv2.bitwise_and(img, img, mask=target_mask)
             output[0 == target_mask] = [255, 255, 255]
 
-            if self.is_legal_point(center):
-                cv2.drawMarker(output, self.point_to_display(center),
-                               color=[150, 150, 150], markerType=1, thickness=3,
-                               markerSize=10)
-            if self.is_legal_point(direction[0]) and self.is_legal_point(direction[1]):
-                cv2.line(output, self.point_to_display(direction[0]),
-                         self.point_to_display(direction[1]), [255, 255, 255], 3)
+            self.show_center_and_direction(center, direction, output)
 
             # show the images
-            img_to_show = cv2.resize(img, (350, 700))
-            output_to_show = cv2.resize(output, (350, 700))
-            cv2.imshow("images", np.hstack([img_to_show, output_to_show]))
+            if resize:
+                img = cv2.resize(img, (350, 700))
+                output  = cv2.resize(output, (350, 700))
+            cv2.imshow("images", np.hstack([img, output]))
+
             cv2.waitKey(0)
+
+    def display_all_markers(self, img, findings):
+        total_mask = 0
+        for finding in findings:
+            target_mask, _, _ = finding
+            total_mask = cv2.bitwise_or(total_mask, target_mask)
+
+        # apply the mask, and fill the background white
+        output = cv2.bitwise_and(img, img, mask=total_mask)
+        output[0 == total_mask] = [255, 255, 255]
+
+        for finding in findings:
+            _, center, direction = finding
+            self.show_center_and_direction(center, direction, output)
+
+        stacked = np.hstack([img, output])
+        if DEBUG:
+            cv2.imwrite(r'res\result.png', stacked)
+        cv2.imshow("images", stacked)
+
+    def show_center_and_direction(self, center, direction, output):
+        if self.is_legal_point(center):
+            # show the car center
+            cv2.drawMarker(output, self.point_to_display(center),
+                           color=[150, 150, 150], markerType=1, thickness=3,
+                           markerSize=10)
+        if self.is_legal_point(direction[0]) and self.is_legal_point(direction[1]):
+            # show the direction
+            cv2.line(output, self.point_to_display(direction[0]),
+                     self.point_to_display(direction[1]), [255, 255, 255], 2)
+            # mark the head
+            cv2.drawMarker(output, self.point_to_display(direction[1]),
+                           color=[255, 255, 255], markerType=2, thickness=2,
+                           markerSize=7)
 
     def is_legal_point(self, point):
         return not math.isnan(point[0]) and not math.isnan(point[1])
@@ -120,14 +170,13 @@ class Detector(object):
         return int(point[1]), int(point[0])
 
     def start_color_picking(self, img, hsv = True):
-        img_resized = cv2.resize(img, (300, 600))
         if hsv == True:
-            self.image_color_pick = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
+            self.image_color_pick = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         else:
-            self.image_color_pick = img_resized
+            self.image_color_pick = img
 
         window_name = 'color_picking'
-        cv2.imshow('color_picking', img_resized)
+        cv2.imshow('color_picking', img)
 
         cv2.setMouseCallback(window_name, self.mouse_callback)
 
@@ -151,20 +200,9 @@ if __name__ == '__main__':
 
     detector = Detector()
     results = detector.find_all_targets(image, hsv)
-    detector.display_markers(image, results)
+    detector.display_all_markers(image, results)
+    cv2.waitKey(0)
 
-    # detector = Detector()
-    # detector.find_target_mask(image, hsv, [0,1])
-
-    # detector = Detector()
-    #
-    # small = cv2.resize(image, (300, 600))
-    # detector.start_color_picking(small)
-    # cv2.imshow('0', small)
-    #
-    # for ind in range(DIFFERENT_COLORS):
-    #     res = detector.find_img_by_color_mask(hsv, ind)
-    #     small = cv2.resize(res, (300, 600))
-    #     cv2.imshow('1', small)
-    #
-    #     cv2.waitKey(0)
+    # detector.start_color_picking(image)
+    # cv2.imshow('0', image)
+    # cv2.waitKey(0)
