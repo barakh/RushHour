@@ -1,5 +1,6 @@
 import cv2
 import threading
+import time
 
 WIFI_CAM_ADDRESS = 'rtsp://192.168.1.254/sjcam.mov'
 STREET_CAM_STREAM = 'http://204.248.124.202/mjpg/video.mjpg' # God knows where
@@ -20,22 +21,46 @@ class Camera(object):
         '''
         :param address: Integer for device, path for file, url for stream.
         '''
-        self._vcap = cv2.VideoCapture(address)
-
-        if self.is_opened == False:
-            raise FailedOpeningVideoError
+        self.address = address
 
         self._frame_lock = threading.Lock()
         self._current_frame = None
 
+        self.startContinuousReadThread()
+        self.startWatchdogThread()
+
+    def startContinuousReadThread(self):
         # This thread continuously reads frames from the camera stream.
-        # When cv2.VideoCapture.read is called, it returs the next frame,
+        # When cv2.VideoCapture.read is called, it returns the next frame,
         # not the latest. In order to get the latest frame, we
         # always read frames and throw them away.
         self._read_thread = threading.Thread(target = self._readContinuous,
                                              name = 'read_thread')
         self._read_thread.setDaemon(True)
         self._read_thread.start()
+
+    def startWatchdogThread(self):
+        self._watchdog_thread = threading.Thread(target = self._watchdog,
+                                                 name = 'watchdog_thread')
+        self._watchdog_thread.setDaemon(True)
+
+        self._watchdog_kicked = False
+        self._watchdog_thread.start()
+
+    def _watchdog(self):
+        time.sleep(10)
+        while (True):
+            time.sleep(1)
+
+            if self._watchdog_kicked == False:
+                print 'Bark! Read thread stuck. Restarting.'
+                del self._read_thread
+                # del self._vcap
+
+                self.startContinuousReadThread()
+                time.sleep(10)
+
+            self._watchdog_kicked = False
 
     @property
     def is_opened(self):
@@ -49,10 +74,18 @@ class Camera(object):
         (Read frames but don't display them).
         Normally runs in a thread that is owned by the class.
         '''
+        self._vcap = cv2.VideoCapture(self.address)
+
+        if self.is_opened == False:
+            raise FailedOpeningVideoError
+
         while (True):
+            self._watchdog_kicked = True
+
             ret, frame = self._vcap.read()
 
             if ret == False:
+                print 'FailedReadFrameError'
                 raise FailedReadFrameError
 
             with self._frame_lock:
