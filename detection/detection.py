@@ -7,11 +7,13 @@ import math
 # IMG_PATH = r'sample_images\cars_hsv_s_0.5_v_0.5_artificial.png'
 # IMG_PATH = r'sample_images\cars_hsv_s_0.5_v_0.5_photographed.png'
 IMG_PATH = r'..\screenshot_000.png'
+# IMG_PATH = r'white.png'
 
-DIFFERENT_COLORS = 7
+
+DIFFERENT_COLORS = 4
 HUE_MAX = 179
-MIN_CAR_SIZE = 500
-MAX_CAR_SIZE = 10000
+MIN_CAR_SIZE = 300
+MAX_CAR_SIZE = 600
 DILATION_KERNAL_SIZE = 5
 DILATION_ITERATIONS = 4
 
@@ -20,16 +22,20 @@ DEBUG = True
 
 class Detector(object):
     def __init__(self):
-        lower_bounds = [int(HUE_MAX * float(i)/DIFFERENT_COLORS) for i in range(DIFFERENT_COLORS)]
-        upper_bounds = [int(HUE_MAX * float(i+1)/DIFFERENT_COLORS) - 1 for i in range(DIFFERENT_COLORS)]
-        upper_bounds[-1] = HUE_MAX  # to include all possibilities
+        # lower_bounds = [int(HUE_MAX * float(i)/DIFFERENT_COLORS) for i in range(DIFFERENT_COLORS)]
+        # upper_bounds = [int(HUE_MAX * float(i+1)/DIFFERENT_COLORS) - 1 for i in range(DIFFERENT_COLORS)]
+        # upper_bounds[-1] = HUE_MAX  # to include all possibilities
 
-        self.color_array_boundaries = [(np.array([lower, 50, 1], dtype="uint8"),
+        # 4 colors- ~17, ~50-60, ~106, ~150
+        lower_bounds = [10, 0, 105, 160]
+        upper_bounds = [25, 0, 115, 170]
+        self.color_array_boundaries = [(np.array([lower, 35, 1], dtype="uint8"),
                                         np.array([upper, 255, 255], dtype="uint8"))
                                        for lower, upper in zip(lower_bounds, upper_bounds)]
         self.color_ids = range(DIFFERENT_COLORS)
         # TODO- only valid car combos, ordered back-color -> front-color, i.e: [(1,2), (2,3)]
-        self.possible_cars = itertools.combinations(self.color_ids, 2)
+        # self.possible_cars = itertools.combinations(self.color_ids, 2)
+        self.possible_cars = [(2,0), (0,3), (3,2)]
 
     def find_img_by_color_mask(self, hsv_img, color):
         # find the colors within the specified boundaries
@@ -203,6 +209,8 @@ if __name__ == '__main__':
     detector.display_all_markers(image, results)
     cv2.waitKey(0)
 
-    # detector.start_color_picking(image)
-    # cv2.imshow('0', image)
-    # cv2.waitKey(0)
+    # For color picking, uncomment:
+    # detector = Detector()
+    detector.start_color_picking(image)
+    cv2.imshow('0', image)
+    cv2.waitKey(0)
