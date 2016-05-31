@@ -117,8 +117,8 @@ class Camera(object):
         return frame
 
 if __name__ == '__main__':
-    # cam = Camera(WIFI_CAM_ADDRESS)
-    cam = Camera(STREET_CAM_STREAM)
+    cam = Camera(WIFI_CAM_ADDRESS)
+    # cam = Camera(STREET_CAM_STREAM)
 
     im_ind = 0
 
