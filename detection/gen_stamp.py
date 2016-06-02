@@ -8,8 +8,8 @@ BLUE =  (  0,   0, 255)
 GREEN = (  0, 255,   0)
 RED =   (255,   0,   0)
 
-WIDTH = 90
-LENGTH = 180
+WIDTH = 330
+LENGTH = 770
 
 COLORS = [int(HUE_MAX * (float(i)+0.5)/DIFFERENT_COLORS)
           for i in range(DIFFERENT_COLORS)]
@@ -49,9 +49,11 @@ if __name__ == '__main__':
 
     clock = pygame.time.Clock()
 
-    screen_width = int(WIDTH * DIFFERENT_COLORS * 1.3)
-    screen_length = int(LENGTH * DIFFERENT_COLORS * 1.3)
+    screen_width = 2310 # int(WIDTH * DIFFERENT_COLORS * 1.5)
+    screen_length = 3190 # int(LENGTH * DIFFERENT_COLORS * 1.2)
 
+    width_space_ratio = 0.9
+    len_space_ratio = 0.7
     screen = pygame.display.set_mode((screen_width, screen_length))
 
     done = False
@@ -66,18 +68,19 @@ if __name__ == '__main__':
 
         screen.fill(WHITE)
 
-        x_pos = WIDTH
-        y_pos = LENGTH
+        x_pos = WIDTH * (0.5 + width_space_ratio)
+        y_pos = LENGTH * (0.5 + len_space_ratio)
         for color0_ind, color0 in enumerate(COLORS):
             for color1 in COLORS[(color0_ind+1):]:
                 draw_car(screen, (x_pos, y_pos), (color0, color1))
-                x_pos += 1.5*WIDTH
-            x_pos = WIDTH
-            y_pos += 1.5*LENGTH
+                x_pos += WIDTH * (1 + width_space_ratio)
+                if x_pos >= screen_width * 0.9:
+                    x_pos = WIDTH * (0.5 + width_space_ratio)
+                    y_pos += LENGTH * (1 + len_space_ratio)
 
         pygame.display.flip()
 
-    pygame.image.save(screen, "screenshot.png".format(SAT, VAL))
+    pygame.image.save(screen, "cars_{0}_colors.png".format(DIFFERENT_COLORS))
     # pygame.image.save(screen, "cars_hsv_s_{0}_v_{1}.png".format(SAT, VAL))
 
     pygame.quit()
